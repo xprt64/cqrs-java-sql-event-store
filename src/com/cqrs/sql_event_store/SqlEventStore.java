@@ -40,7 +40,7 @@ public class SqlEventStore implements EventStore {
         mapper.setVisibility(PropertyAccessor.FIELD, Visibility.ANY);
         mapper.registerModule(new ParameterNamesModule(JsonCreator.Mode.PROPERTIES));
         mapper.findAndRegisterModules();
-        mapper.enableDefaultTyping(ObjectMapper.DefaultTyping.NON_CONCRETE_AND_ARRAYS, JsonTypeInfo.As.PROPERTY);
+        mapper.enableDefaultTyping(ObjectMapper.DefaultTyping.EVERYTHING, JsonTypeInfo.As.PROPERTY);
     }
 
     public static String makeStreamId(AggregateDescriptor aggregateDescriptor) throws NoSuchAlgorithmException {

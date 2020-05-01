@@ -1,0 +1,10 @@
+<component name="libraryTable">
+  <library name="cqrs_java2_jar">
+    <CLASSES>
+      <root url="file://$PROJECT_DIR$/../cqrs-java/out/artifacts/cqrs_java2_jar" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+    <jarDirectory url="file://$PROJECT_DIR$/../cqrs-java/out/artifacts/cqrs_java2_jar" recursive="false" />
+  </library>
+</component>

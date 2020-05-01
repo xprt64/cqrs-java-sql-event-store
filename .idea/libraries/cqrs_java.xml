@@ -1,9 +1,0 @@
-<component name="libraryTable">
-  <library name="cqrs-java">
-    <CLASSES>
-      <root url="jar://$PROJECT_DIR$/../cqrs-java/out/artifacts/cqrs_java_jar/cqrs-java.jar!/" />
-    </CLASSES>
-    <JAVADOC />
-    <SOURCES />
-  </library>
-</component>
