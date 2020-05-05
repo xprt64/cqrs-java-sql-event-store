@@ -52,7 +52,6 @@
                 <configuration>
                     <source>1.8</source>
                     <target>1.8</target>
-                    <!-- Disable annotation processing for ourselves. -->
                     <compilerArgument>-parameters</compilerArgument>
                 </configuration>
             </plugin>
