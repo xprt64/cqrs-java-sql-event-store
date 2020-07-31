@@ -5,9 +5,11 @@ import com.cqrs.base.Event;
 import com.cqrs.event_store.exceptions.StorageException;
 import com.cqrs.events.EventWithMetaData;
 import com.cqrs.events.MetaData;
+import  com.mysql.cj.jdbc.MysqlDataSource;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import javax.sql.DataSource;
 import java.security.NoSuchAlgorithmException;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -22,17 +24,19 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class SqlEventStoreTest {
 
-    private Connection connection;
+    private MysqlDataSource dataSource;
 
     @BeforeEach
-    void setUp() throws ClassNotFoundException, SQLException {
-        connection = DriverManager.getConnection(
-            "jdbc:mysql://localhost:3306/eventstore", "root", "pw");
+    void setUp() throws SQLException {
+        dataSource = new MysqlDataSource();
+        dataSource.setURL("jdbc:mysql://localhost:3306/eventstore");
+        dataSource.setUser("root");
+        dataSource.setPassword("pw");
     }
 
     @Test
     public void normalUse() throws SQLException, NoSuchAlgorithmException, StorageException {
-        SqlEventStore sut = new SqlEventStore(connection, "test1");
+        SqlEventStore sut = new SqlEventStore(dataSource, "normalUse");
 
         sut.dropStore();
         sut.createStore();
@@ -54,7 +58,7 @@ class SqlEventStoreTest {
 
     @Test
     public void loadEventsByClassNames() throws SQLException, NoSuchAlgorithmException, StorageException {
-        SqlEventStore sut = new SqlEventStore(connection, "test1");
+        SqlEventStore sut = new SqlEventStore(dataSource, "loadEventsByClassNames");
 
         sut.dropStore();
         sut.createStore();
@@ -98,7 +102,7 @@ class SqlEventStoreTest {
 
     @Test
     public void withNestedEvent() throws SQLException, NoSuchAlgorithmException, StorageException {
-        SqlEventStore sut = new SqlEventStore(connection, "test1");
+        SqlEventStore sut = new SqlEventStore(dataSource, "withNestedEvent");
 
         sut.dropStore();
         sut.createStore();
@@ -120,7 +124,7 @@ class SqlEventStoreTest {
 
     @Test
     public void appendEventsForAggregateShouldFailOnConcurrent() throws SQLException, NoSuchAlgorithmException, StorageException {
-        SqlEventStore sut = new SqlEventStore(connection, "test1");
+        SqlEventStore sut = new SqlEventStore(dataSource, "appendEventsForAggregateShouldFailOnConcurrent");
 
         sut.dropStore();
         sut.createStore();
