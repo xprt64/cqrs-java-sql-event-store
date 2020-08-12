@@ -4,9 +4,9 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>com.cqrs</groupId>
-    <artifactId>sql-event-store</artifactId>
-    <version>1.3-SNAPSHOT</version>
+    <groupId>com.github.xprt64</groupId>
+    <artifactId>cqrs-sql-event-store</artifactId>
+    <version>1.0</version>
     <properties>
         <maven.compiler.source>1.8</maven.compiler.source>
         <maven.compiler.target>1.8</maven.compiler.target>
@@ -36,9 +36,9 @@
             <version>8.0.19</version>
         </dependency>
         <dependency>
-            <groupId>com.cqrs</groupId>
-            <artifactId>core</artifactId>
-            <version>1.0-SNAPSHOT</version>
+            <groupId>com.github.xprt64</groupId>
+            <artifactId>cqrs</artifactId>
+            <version>1.0</version>
         </dependency>
     </dependencies>
     <build>
