@@ -31,20 +31,33 @@ public class SqlEventStore implements EventStore {
 
     private final DataSource dataSource;
     private final String tableName;
+    private final CreateTableSqlFactory sqlFactory;
     private final HashMap<String, Class<?>> classCache = new HashMap<>();
 
     ObjectMapper mapper = new ObjectMapper();
 
     public SqlEventStore(
         DataSource dataSource,
-        String tableName
+        String tableName,
+        CreateTableSqlFactory sqlFactory
     ) {
         this.dataSource = dataSource;
         this.tableName = tableName;
+        if (null == sqlFactory) {
+            sqlFactory = defaultFactory();
+        }
+        this.sqlFactory = sqlFactory;
         mapper.setVisibility(PropertyAccessor.FIELD, Visibility.ANY);
         mapper.registerModule(new ParameterNamesModule(JsonCreator.Mode.PROPERTIES));
         mapper.findAndRegisterModules();
         mapper.enableDefaultTyping(ObjectMapper.DefaultTyping.EVERYTHING, JsonTypeInfo.As.PROPERTY);
+    }
+
+    public SqlEventStore(
+        DataSource dataSource,
+        String tableName
+    ) {
+        this(dataSource, tableName, null);
     }
 
     public static String makeStreamId(AggregateDescriptor aggregateDescriptor) throws NoSuchAlgorithmException {
@@ -59,25 +72,33 @@ public class SqlEventStore implements EventStore {
             try (Statement stmt = connection.createStatement()) {
                 int aggregateIdLength = Guid.generate().length();
                 int aggregateStreamLength = makeStreamId(new AggregateDescriptor("1", "2")).length();
-
-                String sql = "CREATE TABLE IF NOT EXISTS " + tableName + "  (" +
-                    " id BIGINT NOT NULL AUTO_INCREMENT, " +
-                    " aggregateStream VARCHAR(" + aggregateStreamLength + ")  NOT NULL, " +
-                    " aggregateType VARCHAR(255)  NOT NULL, " +
-                    " aggregateId VARCHAR(" + aggregateIdLength + ") NOT NULL, " +
-                    " version INTEGER (255) NOT NULL, " +
-                    " eventType VARCHAR(255) NOT NULL, " +
-                    " payload MEDIUMBLOB NOT NULL, " +
-                    " dateCreated DATETIME  NOT NULL, " +
-                    " PRIMARY KEY ( id )," +
-                    "  INDEX aggregateStream ( aggregateStream )," +
-                    "  INDEX eventType ( eventType )," +
-                    " UNIQUE KEY ( aggregateStream, version )" +
-                    ") ENGINE=InnoDB DEFAULT CHARSET = utf8" +
-                    "";
+                String sql = sqlFactory.generateSql(tableName, aggregateIdLength, aggregateStreamLength);
                 stmt.executeUpdate(sql);
             }
         }
+    }
+
+    private CreateTableSqlFactory defaultFactory() {
+        return (tableName, aggregateIdLength, aggregateStreamLength) ->
+            "CREATE TABLE IF NOT EXISTS " + tableName + "  (" +
+                " id BIGINT NOT NULL AUTO_INCREMENT, " +
+                " aggregateStream VARCHAR(" + aggregateStreamLength + ")  NOT NULL, " +
+                " aggregateType VARCHAR(255)  NOT NULL, " +
+                " aggregateId VARCHAR(" + aggregateIdLength + ") NOT NULL, " +
+                " version INTEGER (255) NOT NULL, " +
+                " eventType VARCHAR(255) NOT NULL, " +
+                " payload MEDIUMBLOB NOT NULL, " +
+                " dateCreated DATETIME  NOT NULL, " +
+                " PRIMARY KEY ( id )," +
+                "  INDEX aggregateStream ( aggregateStream )," +
+                "  INDEX eventType ( eventType )," +
+                " UNIQUE KEY ( aggregateStream, version )" +
+                ") ENGINE=InnoDB DEFAULT CHARSET = utf8" +
+                "";
+    }
+
+    public interface CreateTableSqlFactory {
+        String generateSql(String tableName, int aggregateIdLength, int aggregateStreamLength);
     }
 
     public void dropStore() throws SQLException {
@@ -93,10 +114,10 @@ public class SqlEventStore implements EventStore {
         int version = -1;
         try (Connection connection = dataSource.getConnection()) {
             try (PreparedStatement stm = connection.prepareStatement("" +
-                "SELECT *  " +
-                "FROM " + tableName + " " +
-                "WHERE aggregateStream = ? " +
-                "ORDER BY id ASC ")) {
+                                                                         "SELECT *  " +
+                                                                         "FROM " + tableName + " " +
+                                                                         "WHERE aggregateStream = ? " +
+                                                                         "ORDER BY id ASC ")) {
                 stm.setString(1, SqlEventStore.makeStreamId(aggregateDescriptor));
                 try (ResultSet result = stm.executeQuery()) {
                     while (result.next()) {
@@ -129,10 +150,10 @@ public class SqlEventStore implements EventStore {
             try {
                 for (EventWithMetaData eventWithMetaData : eventsWithMetaData) {
                     int index = 0;
-                    try(PreparedStatement stm = connection.prepareStatement("INSERT INTO " + tableName +
-                        " (aggregateStream,aggregateType,aggregateId,version,eventType,payload,dateCreated) " +
-                        " VALUES(?,?,?,?,?,?,?)" +
-                        "")){
+                    try (PreparedStatement stm = connection.prepareStatement("INSERT INTO " + tableName +
+                                                                                 " (aggregateStream,aggregateType,aggregateId,version,eventType,payload,dateCreated) " +
+                                                                                 " VALUES(?,?,?,?,?,?,?)" +
+                                                                                 "")) {
                         stm.setString(++index, streamId);
                         stm.setString(++index, aggregateDescriptor.aggregateClass);
                         stm.setString(++index, aggregateDescriptor.aggregateId);
@@ -167,13 +188,13 @@ public class SqlEventStore implements EventStore {
     public void loadEventsByClassNames(List<String> eventClasses, Predicate<EventWithMetaData> consumer) throws StorageException {
         String eventClassesStr = eventClasses.stream().map(eventClass -> "'" + eventClass + "'").collect(Collectors.joining(","));
         try (Connection connection = dataSource.getConnection()) {
-            try(PreparedStatement stm = connection.prepareStatement("" +
-                "SELECT *  " +
-                "FROM " + tableName + " " +
-                "WHERE eventType IN (" + eventClassesStr + ") " +
-                "ORDER BY id ASC ")){
+            try (PreparedStatement stm = connection.prepareStatement("" +
+                                                                         "SELECT *  " +
+                                                                         "FROM " + tableName + " " +
+                                                                         "WHERE eventType IN (" + eventClassesStr + ") " +
+                                                                         "ORDER BY id ASC ")) {
                 stm.setFetchSize(100);
-                try(ResultSet result = stm.executeQuery()){
+                try (ResultSet result = stm.executeQuery()) {
                     while (result.next()) {
                         if (!consumer.test(rehydrateEvent(result))) {
                             return;
@@ -191,8 +212,9 @@ public class SqlEventStore implements EventStore {
     public int countEventsByClassNames(List<String> eventClasses) throws StorageException {
         String eventClassesStr = eventClasses.stream().map(eventClass -> "'" + eventClass + "'").collect(Collectors.joining(","));
         try (Connection connection = dataSource.getConnection()) {
-            try(PreparedStatement stm = connection.prepareStatement("SELECT COUNT(id) as cnt  FROM " + tableName + " WHERE eventType IN (" + eventClassesStr + ") ORDER BY id ASC ");){
-                try(ResultSet result = stm.executeQuery();){
+            try (PreparedStatement stm = connection.prepareStatement(
+                "SELECT COUNT(id) as cnt  FROM " + tableName + " WHERE eventType IN (" + eventClassesStr + ") ORDER BY id ASC ");) {
+                try (ResultSet result = stm.executeQuery();) {
                     while (result.next()) {
                         return result.getInt("cnt");
                     }
@@ -231,7 +253,7 @@ public class SqlEventStore implements EventStore {
     }
 
     private Class<?> loadClass(String eventType) throws ClassNotFoundException {
-        if(!classCache.containsKey(eventType)){
+        if (!classCache.containsKey(eventType)) {
             classCache.put(eventType, Class.forName(eventType));
         }
         return classCache.get(eventType);
@@ -254,15 +276,14 @@ public class SqlEventStore implements EventStore {
         return null;
     }
 
-    public enum FieldPostions{
+    public enum FieldPostions {
         ID(1),
         AGGREGATE_TYPE(3),
         AGGREGATE_ID(4),
         DATE_CREATED(8),
         VERSION(5),
         EVENT_TYPE(6),
-        PAYLOAD(7)
-        ;
+        PAYLOAD(7);
 
         private final int value;
 
